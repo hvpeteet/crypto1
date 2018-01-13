@@ -1,7 +1,10 @@
 from collections import defaultdict
 
+# The ciphertext that we are trying to decrypt
 target = '32510ba9babebbbefd001547a810e67149caee11d945cd7fc81a05e9f85aac650e9052ba6a8cd8257bf14d13e6f0a803b54fde9e77472dbff89d71b57bddef121336cb85ccb8f3315f4b52e301d16e9f52f904'
 
+# 10 cyphertexts that we are given
+# These all are encrypted using the same one time pad
 ct = [
 '315c4eeaa8b5f8aaf9174145bf43e1784b8fa00dc71d885a804e5ee9fa40b16349c146fb778cdf2d3aff021dfff5b403b510d0d0455468aeb98622b137dae857553ccd8883a7bc37520e06e515d22c954eba5025b8cc57ee59418ce7dc6bc41556bdb36bbca3e8774301fbcaa3b83b220809560987815f65286764703de0f3d524400a19b159610b11ef3e',
 '234c02ecbbfbafa3ed18510abd11fa724fcda2018a1a8342cf064bbde548b12b07df44ba7191d9606ef4081ffde5ad46a5069d9f7f543bedb9c861bf29c7e205132eda9382b0bc2c5c4b45f919cf3a9f1cb74151f6d551f4480c82b2cb24cc5b028aa76eb7b4ab24171ab3cdadb8356f',
@@ -15,10 +18,17 @@ ct = [
 '466d06ece998b7a2fb1d464fed2ced7641ddaa3cc31c9941cf110abbf409ed39598005b3399ccfafb61d0315fca0a314be138a9f32503bedac8067f03adbf3575c3b8edc9ba7f537530541ab0f9f3cd04ff50d66f1d559ba520e89a2cb2a83',
 ]
 
-target_len = len(target)
-pad_votes = [defaultdict(lambda: 0) for i in range(target_len//2)]
+# List of possible bytes in the key.
+# This is built up from analysing the ciphertexts that are given to analyse_ciphertexts.
+# Structure is a list of maps:
+#   list: has length of the number of bytes in the target text (length of the key we want)
+#   maps: map possible_byte_value --> votes from analyse_ciphertexts
+pad_votes = [defaultdict(lambda: 0) for i in range(len(target)//2)]
 
 def get_likely_pad():
+    '''
+    Looks through pad_votes and chooses the most likely byte for each byte in the key.
+    '''
     final = []
     for candidates in pad_votes:
         most_likely = 0x00
@@ -31,9 +41,13 @@ def get_likely_pad():
         print(num_votes)
     return final
 
-def xor_cts(s1, s2):
+def analyse_ciphertexts(s1, s2):
+    '''
+    Analyses 2 ciphertexts that use the same pad and votes on up to 2 possible
+    bytes in each position of the pad (via modifying pad_votes)
+    '''
     final = ''
-    for i in range(0, target_len, 2):
+    for i in range(0, len(target), 2):
         t = int(target[i: i+2], 16)
         c1 = int(s1[i: i+2], 16)
         c2 = int(s2[i: i+2], 16)
@@ -44,11 +58,17 @@ def xor_cts(s1, s2):
             k_if_m2_space = c2 ^ ord(' ')
             pad_votes[i//2][k_if_m1_space] += 1
             pad_votes[i//2][k_if_m2_space] += 1
-        
 
 def apply_pad(s, pad):
+    '''
+    Applies a pad to a ciphertext
+    Args:
+         s: a string representation of the hex encoded ciphertext.
+         pad: the pad represented as a list of ints where each int represents 1 byte in the pad
+    Returns: A string with the decoded ciphertext
+    '''
     final = ''
-    for i in range(0, target_len, 2):
+    for i in range(0, len(target), 2):
         c = int(s[i: i+2], 16)
         xor = (c ^ pad[i//2]) & 0x7F
         char = chr(xor)
@@ -59,7 +79,7 @@ def apply_pad(s, pad):
 def main():
     for i in range(len(ct)):
         for j in range(i+1, len(ct)):
-            xor_cts(ct[i], ct[j])
+            analyse_ciphertexts(ct[i], ct[j])
     pad = get_likely_pad()
     print(apply_pad(target, pad))
 
