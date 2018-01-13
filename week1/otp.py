@@ -56,7 +56,6 @@ def get_likely_pad():
                 most_likely = k
                 num_votes = v
         final.append(most_likely)
-        print(num_votes)
     return final
 
 def apply_pad(s, pad):
