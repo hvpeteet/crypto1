@@ -25,22 +25,6 @@ ct = [
 #   maps: map possible_byte_value --> votes from analyse_ciphertexts
 pad_votes = [defaultdict(lambda: 0) for i in range(len(target)//2)]
 
-def get_likely_pad():
-    '''
-    Looks through pad_votes and chooses the most likely byte for each byte in the key.
-    '''
-    final = []
-    for candidates in pad_votes:
-        most_likely = 0x00
-        num_votes = 0
-        for k, v in candidates.items():
-            if v > num_votes:
-                most_likely = k
-                num_votes = v
-        final.append(most_likely)
-        print(num_votes)
-    return final
-
 def analyse_ciphertexts(s1, s2):
     '''
     Analyses 2 ciphertexts that use the same pad and votes on up to 2 possible
@@ -58,6 +42,22 @@ def analyse_ciphertexts(s1, s2):
             k_if_m2_space = c2 ^ ord(' ')
             pad_votes[i//2][k_if_m1_space] += 1
             pad_votes[i//2][k_if_m2_space] += 1
+
+def get_likely_pad():
+    '''
+    Looks through pad_votes and chooses the most likely byte for each byte in the key.
+    '''
+    final = []
+    for candidates in pad_votes:
+        most_likely = 0x00
+        num_votes = 0
+        for k, v in candidates.items():
+            if v > num_votes:
+                most_likely = k
+                num_votes = v
+        final.append(most_likely)
+        print(num_votes)
+    return final
 
 def apply_pad(s, pad):
     '''
