@@ -18,10 +18,10 @@ ct = [
 '466d06ece998b7a2fb1d464fed2ced7641ddaa3cc31c9941cf110abbf409ed39598005b3399ccfafb61d0315fca0a314be138a9f32503bedac8067f03adbf3575c3b8edc9ba7f537530541ab0f9f3cd04ff50d66f1d559ba520e89a2cb2a83',
 ]
 
-# List of possible bytes in the key.
+# List of possible bytes in the pad.
 # This is built up from analysing the ciphertexts that are given to analyse_ciphertexts.
 # Structure is a list of maps:
-#   list: has length of the number of bytes in the target text (length of the key we want)
+#   list: has length of the number of bytes in the target text (length of the pad we want)
 #   maps: map possible_byte_value --> votes from analyse_ciphertexts
 pad_votes = [defaultdict(lambda: 0) for i in range(len(target)//2)]
 
@@ -45,7 +45,7 @@ def analyse_ciphertexts(s1, s2):
 
 def get_likely_pad():
     '''
-    Looks through pad_votes and chooses the most likely byte for each byte in the key.
+    Looks through pad_votes and chooses the most likely byte for each byte in the pad.
     '''
     final = []
     for candidates in pad_votes:
