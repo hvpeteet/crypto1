@@ -3,8 +3,10 @@ use std::collections::HashMap;
 use std::cmp;
 
 fn main() {
+    // The target ciphertext to decrypt
     let target_str = "32510ba9babebbbefd001547a810e67149caee11d945cd7fc81a05e9f85aac650e9052ba6a8cd8257bf14d13e6f0a803b54fde9e77472dbff89d71b57bddef121336cb85ccb8f3315f4b52e301d16e9f52f904";
 
+    // Intercepted ciphertexts that all use the same pad.
     let ciphertexts_str = &[
         "315c4eeaa8b5f8aaf9174145bf43e1784b8fa00dc71d885a804e5ee9fa40b16349c146fb778cdf2d3aff021dfff5b403b510d0d0455468aeb98622b137dae857553ccd8883a7bc37520e06e515d22c954eba5025b8cc57ee59418ce7dc6bc41556bdb36bbca3e8774301fbcaa3b83b220809560987815f65286764703de0f3d524400a19b159610b11ef3e",
         "234c02ecbbfbafa3ed18510abd11fa724fcda2018a1a8342cf064bbde548b12b07df44ba7191d9606ef4081ffde5ad46a5069d9f7f543bedb9c861bf29c7e205132eda9382b0bc2c5c4b45f919cf3a9f1cb74151f6d551f4480c82b2cb24cc5b028aa76eb7b4ab24171ab3cdadb8356f",
@@ -18,34 +20,114 @@ fn main() {
         "466d06ece998b7a2fb1d464fed2ced7641ddaa3cc31c9941cf110abbf409ed39598005b3399ccfafb61d0315fca0a314be138a9f32503bedac8067f03adbf3575c3b8edc9ba7f537530541ab0f9f3cd04ff50d66f1d559ba520e89a2cb2a83",
     ];
 
-    // Turn strings into vectors
-    let mut target: Vec<u8> = Vec::new();
-    for i in 0..target_str.len()/2 {
-        target.push(u8::from_str_radix(target_str[i*2..i*2+2].to_string().as_str(), 16).expect("The input strings are not hex encoded"));
+    let mut breaker: OTPBreaker = OTPBreaker::new();
+    for string in ciphertexts_str {
+        breaker.add_message(hex_str_to_u8_vec(string));
     }
-    
-    let mut ciphertexts: Vec<Vec<u8>> = Vec::new();
-    for ciphertext in ciphertexts_str {
-        let mut tmp: Vec<u8> = Vec::new();
-        for i in 0..ciphertext.len()/2 {
-            tmp.push(u8::from_str_radix(ciphertext[i*2..i*2+2].to_string().as_str(), 16).expect("The input strings are not hex encoded"));
-        }
-        ciphertexts.push(tmp);
-    }
-    
-    // Analyze
-    let votes = analyse_ciphertexts(&ciphertexts, &target);
-    // Get pad
-    let pad = get_likely_pad(&votes);
-    // Apply pad
-    let final_vec = apply_pad(&target, &pad);
-    let mut final_str = String::new();
-    for v in final_vec {
-        final_str.push(v as char);
-    }
+    let final_msg: Vec<u8> = breaker.attempt_decode(&hex_str_to_u8_vec(target_str));
+    let final_str: String = u8_vec_to_string(&final_msg);
+
     println!("---- DECODED MESSAGE ----\n{0}", final_str);
 }
 
+pub struct OTPBreaker {
+    votes: Vec<HashMap<u8, u64>>,
+    ciphertexts: Vec<Vec<u8>>,
+}
+
+impl OTPBreaker {
+
+    fn new() -> OTPBreaker {
+        return OTPBreaker {votes: Vec::new(), ciphertexts: Vec::new()};
+    }
+
+    pub fn add_message(&mut self, message: Vec<u8>) {
+        // Ensure votes is long enough for the existing message
+        if self.votes.len() < message.len() {
+            for _ in self.votes.len()..message.len() {
+                self.votes.push(HashMap::new());
+            }
+        }
+        
+        // Update the votes
+        for j in 0..self.ciphertexts.len() {
+            let ciphertext_a = &message;
+            let ciphertext_b = &self.ciphertexts[j];
+            for k in 0..cmp::min(ciphertext_a.len(), ciphertext_b.len()) {
+                let xor = ciphertext_a[k] ^ ciphertext_b[k];
+                if (('a' as u8) <= xor && xor <= ('z' as u8)) || (('A' as u8) <= xor && xor <= ('Z' as u8)) {
+                    {
+                        let count_a = self.votes[k].entry(ciphertext_a[k] ^ (' ' as u8)).or_insert(0);
+                        *count_a += 1;
+                    }
+                    {
+                        let count_b = self.votes[k].entry(ciphertext_b[k] ^ (' ' as u8)).or_insert(0);
+                        *count_b += 1;
+                    }
+                }
+            }
+        }
+
+        // Add the new message to the set of ciphertexts
+        self.ciphertexts.push(message);
+    }
+
+    /// Uses the existing ciphertexts to try to decode a new one
+    ///
+    /// # Arguments
+    /// 
+    /// `message` - The message to decode.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// 
+    /// ```
+    pub fn attempt_decode(&self, message: &Vec<u8>) -> Vec<u8> {
+        let pad: Vec<u8> = self.get_likely_pad();
+        return apply_pad(&pad, message)
+    }
+
+    fn get_likely_pad(&self) -> Vec<u8> {
+        let mut final_pad: Vec<u8> = Vec::new();
+        for i in 0..self.votes.len() {
+            let mut pad_value: u8 = 0x00;
+            let mut max_votes: u64 = 0x00; 
+            for (val, num_votes) in &self.votes[i] {
+                if *num_votes > max_votes {
+                    pad_value = *val;
+                    max_votes = *num_votes;
+                }
+            }
+            final_pad.push(pad_value);
+        }
+        return final_pad;
+    }
+}
+
+/// Applies a pad to a message and returns the new message.
+/// 
+/// ## WARNING
+/// This will assume all entries are ASCII and will
+/// always only output 7 bit numbers where the most significant 
+/// bit is 0.
+/// 
+/// # Arguments
+/// 
+/// * `message` - The message to apply the pad to.
+/// * `pad` - The pad to apply to the message. 
+/// 
+/// # Examples
+///
+/// ```
+/// let message: Vec<u8> = [0x00, 0x01, 0x02].to_vec();
+/// let pad: Vec<u8> = [0x1F, 0x2F, 0x3F].to_vec();
+/// let result: Vec<u8> = apply_pad(&message, &pad);
+
+/// assert_eq!(0x1F, result[0]);
+/// assert_eq!(0x2E, result[1]);
+/// assert_eq!(0x3D, result[2]);
+/// ```
 fn apply_pad(message: &Vec<u8>, pad: &Vec<u8>) -> Vec<u8> {
     let mut final_vec: Vec<u8> = Vec::new();
     for i in 0..cmp::min(message.len(), pad.len()) {
@@ -54,45 +136,18 @@ fn apply_pad(message: &Vec<u8>, pad: &Vec<u8>) -> Vec<u8> {
     return final_vec;
 }
 
-fn get_likely_pad(votes: &Vec<HashMap<u8, u64>>) -> Vec<u8> {
-    let mut final_pad: Vec<u8> = Vec::new();
-    for i in 0..votes.len() {
-        let mut pad_value: u8 = 0x00;
-        let mut max_votes: u64 = 0x00; 
-        for (val, num_votes) in &votes[i] {
-            if *num_votes > max_votes {
-                pad_value = *val;
-                max_votes = *num_votes;
-            }
-        }
-        final_pad.push(pad_value);
+fn hex_str_to_u8_vec(string: &str) -> Vec<u8> {
+    let mut tmp: Vec<u8> = Vec::new();
+    for i in 0..string.len()/2 {
+        tmp.push(u8::from_str_radix(string[i*2..i*2+2].to_string().as_str(), 16).expect("The input strings are not hex encoded"));
     }
-    return final_pad;
+    return tmp;
 }
 
-fn analyse_ciphertexts(ciphertexts: &Vec<Vec<u8>>, target: &Vec<u8>) -> Vec<HashMap<u8, u64>> {
-    let mut votes: Vec<HashMap<u8, u64>> = Vec::new();
-    for _ in 0..target.len() {
-        votes.push(HashMap::new());
+fn u8_vec_to_string(message: &Vec<u8>) -> String {
+    let mut string: String = String::new();
+    for int in message {
+        string.push(*int as char);
     }
-    for i in 0..ciphertexts.len() {
-        for j in i..ciphertexts.len() {
-            let ciphertext_a = &ciphertexts[i];
-            let ciphertext_b = &ciphertexts[j];
-            for k in 0..cmp::min(cmp::min(ciphertext_a.len(), ciphertext_b.len()), target.len()) {
-                let xor = ciphertext_a[k] ^ ciphertext_b[k];
-                if (('a' as u8) <= xor && xor <= ('z' as u8)) || (('A' as u8) <= xor && xor <= ('Z' as u8)) {
-                    {
-                        let count_a = votes[k].entry(ciphertext_a[k] ^ (' ' as u8)).or_insert(0);
-                        *count_a += 1;
-                    }
-                    {
-                        let count_b = votes[k].entry(ciphertext_b[k] ^ (' ' as u8)).or_insert(0);
-                        *count_b += 1;
-                    }
-                }
-            }
-        }
-    }
-    return votes;
+    return string;
 }
