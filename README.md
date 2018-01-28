@@ -1,4 +1,5 @@
-# Cryptography 1
+# Cryptography 1 
+[![Build Status](https://travis-ci.org/hvpeteet/crypto1.svg?branch=master)](https://travis-ci.org/hvpeteet/crypto1)
 Keeps my solutions for "Cryptography 1" from Stanford offered on Coursera.
 
 ## Note about my Rust code
