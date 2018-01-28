@@ -3,4 +3,12 @@ name = "otp"
 version = "0.1.0"
 authors = ["Henry Peteet <hvpeteet@gmail.com>"]
 
+[lib]
+name="otp"
+path="src/otp.rs"
+
+[[bin]]
+name="otp_example"
+path="src/otp_example.rs"
+
 [dependencies]
