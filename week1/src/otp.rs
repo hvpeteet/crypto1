@@ -11,7 +11,7 @@ pub struct OTPBreaker {
 /// 
 /// # Examples
 /// 
-/// For a full example see main() in the source code.
+/// For a full example see otp_example.rs.
 ///
 /// ```
 /// // The target ciphertext to decrypt
@@ -37,8 +37,8 @@ pub struct OTPBreaker {
 /// }
 /// let final_msg: Vec<u8> = breaker.attempt_decode(&otp::hex_str_to_u8_vec(target_str));
 /// let final_str: String = otp::u8_vec_to_string(&final_msg);
-///
-/// println!("---- DECODED MESSAGE ----\n{0}", final_str);
+/// let orginal_message = "The s";
+/// assert_eq!(orginal_message, final_str.as_str());
 /// ```
 impl OTPBreaker {
 
