@@ -12,9 +12,9 @@ matrix:
     - rust: nightly
 
 env:
-  - TESTFOLDER=week1
-  global:
-  - RUSTFLAGS="-C link-dead-code"
+  - TEST_SUITE=week1
+
+script: cd $TEST_SUITE && cargo test
 
 addons:
   apt:
